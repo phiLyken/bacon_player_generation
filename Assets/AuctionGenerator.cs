@@ -110,8 +110,6 @@ public class AuctionGenerator : MonoBehaviour {
 	/// 3.2. The weight of ALL OTHER positions will be increased by a "static" value, defined in "PositionImportance"
 	/// 3.3. -> For each iteration over the "weighted positions" the weights are altered
 	/// </summary>
-	/// <returns>The weighted position.</returns>
-	/// <param name="positions">Positions.</param>
 	List<Positions> CreatePositionBucket(List<PositionWeight> start_weights, List<PositionWeight> importance, int count){
 		
 		List<Positions> bucket = new List<Positions>();
@@ -137,9 +135,9 @@ public class AuctionGenerator : MonoBehaviour {
 	/// <summary>
 	/// Updates the weights.
 	/// </summary>
-	/// <param name="current">Current.</param>
-	/// <param name="importance">Importance.</param>
-	/// <param name="reset_pos">Reset position.</param>
+	/// <param name="current">list that should be changed</param>
+	/// <param name="importance">list should be in same order than "current", values in "current" will be increased 1:1 by importance</param>
+	/// <param name="reset_pos">This is the position whose weight will be reduced to 0</param>
 	void UpdateWeights(List<PositionWeight> current, List<PositionWeight> importance, Positions reset_pos){
 		Debug.Log("updating weights pos:"+ reset_pos);
 
