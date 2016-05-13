@@ -1,6 +1,8 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+
 
 /// <summary>
 /// Used for weighted lookup of "Positions"
@@ -28,7 +30,7 @@ public enum Positions{
 
 
 public class Auction  {
-
+	
 	public Positions Position;
 	public int Age;
 	public float Level;
@@ -62,8 +64,10 @@ public class AuctionGenerator : MonoBehaviour {
 	List<float> level_bucket;
 
 
+	public List<PosConfig> position_configs;
+
 	void Start(){
-		GenerateMarket();
+	//	GenerateMarket();
 	}
 
 
@@ -76,13 +80,34 @@ public class AuctionGenerator : MonoBehaviour {
 		age_bucket = CreateNumericBucket(PlayerAgeConfigs);
 
 		//fill the position bucket
-		position_bucket = CreatePositionBucket(PositionStartWeights, PositionImportance, age_bucket.Count);
+		position_bucket = CreatePositionBucket3(position_configs, level_bucket.Count);
 
 		//use the buckets to create auctions
 		List<Auction> auctions = GenerateAuctionsFromBuckets(age_bucket, level_bucket, position_bucket);
 
 		foreach(Auction auction in auctions){
-			Debug.Log(auction.ToString());
+//			Debug.Log(auction.ToString());
+		}
+
+		GenerateUIList(auctions);
+	}
+
+	public void GenerateMarket2(){
+
+		DeleteUI();
+
+		//fill the age and level buckets
+		level_bucket = CreateNumericBucket(PlayerLevelConfigs);
+		age_bucket = CreateNumericBucket(PlayerAgeConfigs);
+
+		//fill the position bucket
+		position_bucket = CreatePositionBucket4(PositionStartWeights, level_bucket.Count);
+
+		//use the buckets to create auctions
+		List<Auction> auctions = GenerateAuctionsFromBuckets(age_bucket, level_bucket, position_bucket);
+
+		foreach(Auction auction in auctions){
+			//Debug.Log(auction.ToString());
 		}
 
 		GenerateUIList(auctions);
@@ -141,6 +166,9 @@ public class AuctionGenerator : MonoBehaviour {
 	void UpdateWeights(List<PositionWeight> current, List<PositionWeight> importance, Positions reset_pos){
 		Debug.Log("updating weights pos:"+ reset_pos);
 
+	//	current.ForEach( pw => pw.weight - 5 );
+
+	
 		for(int i = 0; i < current.Count; i++){
 			if(current[i].position == reset_pos){
 				current[i].weight = 0;
@@ -148,6 +176,7 @@ public class AuctionGenerator : MonoBehaviour {
 				current[i].weight += importance[i].weight;
 			}
 		}
+
 	}
 
 
@@ -217,6 +246,9 @@ public class AuctionGenerator : MonoBehaviour {
 
 	void GenerateUIList(List<Auction> auctions){
 
+	
+		auctions = OrderAuctions.OrderByPos(auctions);
+
 		foreach(Auction auction in auctions){
 			GameObject obj = Instantiate( Resources.Load("auction_item") )as GameObject;
 			obj.transform.SetParent(transform, false);
@@ -229,5 +261,104 @@ public class AuctionGenerator : MonoBehaviour {
 		foreach(Transform child in transform) Children.Add(child.gameObject);
 		Children.ForEach(child => Destroy(child));
 	}
+
+
+	[System.Serializable]
+	public class PosConfig{
+		public Positions pos;
+		public int RollCount;
+		public float Min;
+		public float Max;
+
+		public float accumulated;
+	}
+
+
+	List<Positions> CreatePositionBucket2(List<PosConfig> configs, int numOfPlayers){
+
+		List<Positions> positions = new List<Positions>();
+		Dictionary<Positions, float> position_raw = new Dictionary<Positions, float>();
+
+		float total = 0;
+
+		foreach(PosConfig position in configs){
+			
+			position_raw.Add(position.pos, 0);
+
+			for(int i = 0; i < configs.Count; i++){
+				position_raw[position.pos] += Random.Range(position.Min, position.Max);
+			}
+
+			total += position_raw[position.pos];
+		}
+
+		int added_positions = 0;
+
+		foreach(var pair in position_raw){	
+
+			int count = (int) ( ( ((pair.Value) / total) * numOfPlayers) + 0.5f);
+			added_positions += count;
+
+			for(int i = 0; i < count; i++){
+				positions.Add( pair.Key);
+			}
+		}
+
+		Debug.Log(added_positions.ToString() );
+
+		positions[5] += numOfPlayers-added_positions;
+
+
+		return positions;
+	}
+
+
+
+
+
+	List<Positions> CreatePositionBucket3(List<PosConfig> configs, int numOfPlayers){
+
+		List<Positions> positions = new List<Positions>();
+
+		//Due to randomness we dont know when we have enough players, so fill the list until we have enough
+		while(positions.Count <  numOfPlayers){
+
+			//In each iteration we cycle through the position confis
+			foreach(PosConfig pos_config in configs){		
+
+
+				//Each configs has defined number of "rolls"..
+				for(int i = 0; i<pos_config.RollCount;i++){		
+
+					//For each roll we generate a uniformly distributed random float and add it to an accumulated value for each position
+					pos_config.accumulated+= Random.Range(pos_config.Min,pos_config.Max);
+
+					//When we reach "1" we increase the number of positions of this type
+					if(pos_config.accumulated > 1.0f){						
+						positions.Add( pos_config.pos);
+						pos_config.accumulated -= 1.0f;
+						if(positions.Count == numOfPlayers) {
+							return positions;
+						}
+					}
+				}
+			}
+		}
+		return positions;
+	}
+
+	List<Positions> CreatePositionBucket4(List<PositionWeight> start_weights, int numOfPlayers){
+
+		List<Positions> bucket = new List<Positions>();
+
+		for(int i = 0; i < numOfPlayers;i++){
+			//find a position from the weighted list
+			Positions pos = GetWeightedPosition(start_weights);
+			bucket.Add(pos);
+		}
+
+		return bucket;
+	}
+
 
 }
